@@ -84,6 +84,46 @@ dados_filtrados_km <- dados_filtrados %>% select(idade_75perc) %>% kmeans(center
 
 dados_filtrados_agrupado = dados_filtrados_km %>% augment(dados_filtrados)
 
+```
+
+<h3>Interpretando os grupos econtrados</h3>
+Utilizando um gráfico de coordenadas paralelas fica ainda mais clara a nossa hipótese sobre a relação entre o número de servidores não-professores e a idade dos funcionários em geral, principalmente nos grupos _3_ e _5_. Vamos observar a média do número de servidores de cada grupo e a média do 75-percentil do tempo de serviço e ver se isso nos diz alguma coisa:
+
+<h4> Grupo 1: </h4>
+```{r}
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 1))$Outro)
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 1))$idade_75perc)
+```
+
+<h4> Grupo 2: </h4>
+```{r}
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 2))$Outro)
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 2))$idade_75perc)
+```
+
+<h4> Grupo 3: </h4>
+```{r}
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 3))$Outro)
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 3))$idade_75perc)
+```
+<h4> Grupo 4: </h4>
+```{r}
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 4))$Outro)
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 4))$idade_75perc)
+```
+<h4> Grupo 5: </h4>
+```{r}
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 5))$Outro)
+mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 5))$idade_75perc)
+```
+
+Observando as métricas de cada grupo conseguimos observar um padrão (não tão claro, até porque a correlação não é tão forte) em que um maior número de servidores realmente incide numa maior idade nas pessoas de uma certa unidade acadêmica. Isso fica ainda mais claro quando observamos o grupo _x_ no qual a maior média de servidores não-professores corresponde a maior média dos 75-percentis de tempo de serviço.
+
+Interessante ainda notar o _grupo y_, onde o 75 percentil do tempo de serviço público é bastante baixo quando comparado aos outros grupos (assim como a quantidade de servidores/professores). Mais estranho ainda é que todos as 3 unidades acadêmicas nesse grupo possuem apenas _1 professor_. Talvez por serem departamentos novos? Podemos verificar na visualização interativa mais abaixo.
+
+
+```{r}
+
 dados_filtrados_km %>% 
     augment(dados_filtrados) %>% 
     gather(key = "variável", value = "valor", -UORG, -.cluster) %>% 
@@ -92,7 +132,9 @@ dados_filtrados_km %>%
     facet_wrap(~ .cluster, scales ="free_x") 
 
 ```
-<h3>Observando os grupos econtrados</h3>
+
+<h3>Observando os grupos encontrados</h3>
+
 ```{r}
 
 plot_ly(
@@ -105,27 +147,19 @@ plot_ly(
         colors = "Set1",
         text = ~paste("<b>",UORG, "</b><br>", "<b>Profs. 20 horas: </b>", prof20, "<br><b>Profs. 40 horas:</b> ", prof40,"<br><b>Servidores: </b>", Outro, "<br><b>75-percentil do tempo de serviço: </b>", format(round(idade_75perc, 2), nsmall=2)),
         hoverinfo = "text"
-        ) 
+        )
 
 ```
 
-###Interpretações sobre os grupos encontrados
 
-Interpretando o gráfico de coordenadas paralelas podemos confirmar o que já suspeitavamos anteriormente, a quantidade de funcionários não-professores tem sim grande influência no tempo de serviço dos servidores dessa unidade, o que nos leva a inferir que os funcionários administrativos dos departamentos são em geral mais antigos na universidade que os professores.
 
-Interessante ainda notar o _grupo 5_, onde o 75 percentil do tempo de serviço público é bastante baixo quando comparado aos outros grupos (assim como a quantidade de servidores/professores). Mais estranho ainda é que todos as 3 unidades acadêmicas nesse grupo possuem apenas _1 professor_. Vejamos as unidades presentes no grupo 5.
-
-```{r}
-print(as.data.frame(dados_filtrados_agrupado %>% filter(.cluster == 5)))
-```
-
-Observando a variável *idade_75perc* mostrada nos dados percebemos que temos servidores com mais de 2 anos de serviço nesses departamentos, ou seja essas unidades acadêmicas já não são tão novas assim. Então por que será que temos tão poucos funcionários/professores nelas? Será que está faltando recursos para fazer contratações? Fica aqui o questionamento...
+Observando a variável *idade_75perc* mostrada nos dados do grupo _y_ percebemos que temos servidores com mais de 2 anos de serviço nesses departamentos, ou seja essas unidades acadêmicas já não são tão novas assim. Então por que será que temos tão poucos funcionários/professores nelas? Será que está faltando recursos para fazer contratações? Fica aqui o questionamento...
 <br>
 
 ###Agora utilizando PCA
 Encontrando os componentes com base nas variáveis originais:
 
-```{r}
+```{r, warning=FALSE}
 
 dados_pca = dados_filtrados %>% column_to_rownames('UORG') %>% prcomp(scale=FALSE)
 
@@ -165,6 +199,10 @@ au <- augment(dados_pca, dados_filtrados_agrupado)
           colors = "Set1",
           text = ~paste("<b>",UORG, "</b><br>", "<b>Profs. 20 horas: </b>", prof20, "<br><b>Profs. 40 horas:</b> ", prof40,"<br><b>Servidores: </b>", Outro, "<br><b>75-percentil do tempo de serviço: </b>", format(round(idade_75perc, 2), nsmall=2)),
           hoverinfo = "text"
-  )
+  ) 
 
 ```
+
+
+<h3>Conclusão</h3>
+Nesta breve análise, foi possível perceber a utilidade da ténica de PCA principalmente para agrupamentos. Muitas vezes reduzir a dimensão dos dados facilita a percepção de relações que de outra maneira estariam escondidas. Isso é possível apenas devido ao poder do PCA de *comprimir* informações multidimensionais e apresenta-las para nós na forma de uma visualização bidimensional, que facilita a percepção de padrões por nós humanos. 
