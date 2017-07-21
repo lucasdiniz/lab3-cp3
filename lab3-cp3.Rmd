@@ -42,7 +42,7 @@ dados_filtrados <- dados %>%
 ```
 Para ter uma noção melhor das relações entre as variáveis, utilizaremos um *descritivo express* que irá deixar claro se houver alguma correlação óbvia nos dados.
 
-```{r}
+```{r, warning=FALSE}
 dados_filtrados %>% 
     select(-UORG) %>% 
     ggpairs(size = .5, 
@@ -60,7 +60,7 @@ Para embasar um pouco mais o agrupamento utilizei a estratégia de comparar:
 
 Com base na proporção dessas duas medidas é possível determinar um bom valor para o número de grupos, uma vez que quando a proporção entre as duas medidas para de aumentar não vale mais a pena aumentar o número de grupos.
 
-```{r}
+```{r, message=TRUE, warning=FALSE}
 how_many_groups = tibble(groups = 1:15) %>% 
     group_by(groups) %>% 
     do(
@@ -87,7 +87,7 @@ dados_filtrados_agrupado = dados_filtrados_km %>% augment(dados_filtrados)
 ```
 
 <h3>Interpretando os grupos econtrados</h3>
-Utilizando um gráfico de coordenadas paralelas fica ainda mais clara a nossa hipótese sobre a relação entre o número de servidores não-professores e a idade dos funcionários em geral, principalmente nos grupos _3_ e _5_. Vamos observar a média do número de servidores de cada grupo e a média do 75-percentil do tempo de serviço e ver se isso nos diz alguma coisa:
+Utilizando um gráfico de coordenadas paralelas fica ainda mais clara a nossa hipótese sobre a relação entre o número de servidores não-professores e a idade dos funcionários em geral, principalmente nos grupos _2_ e _5_. Vamos observar a média do número de servidores de cada grupo e a média do 75-percentil do tempo de serviço e ver se isso nos diz alguma coisa:
 
 <h4> Grupo 1: </h4>
 ```{r}
@@ -117,12 +117,12 @@ mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 5))
 mean((dados_filtrados_km %>% augment(dados_filtrados) %>% filter(.cluster == 5))$idade_75perc)
 ```
 
-Observando as métricas de cada grupo conseguimos observar um padrão (não tão claro, até porque a correlação não é tão forte) em que um maior número de servidores realmente incide numa maior idade nas pessoas de uma certa unidade acadêmica. Isso fica ainda mais claro quando observamos o grupo _x_ no qual a maior média de servidores não-professores corresponde a maior média dos 75-percentis de tempo de serviço.
+Observando as métricas de cada grupo conseguimos observar um padrão (não tão claro, até porque a correlação não é tão forte) em que um maior número de servidores realmente incide numa maior idade nas pessoas de uma certa unidade acadêmica. Isso fica ainda mais claro quando observamos o grupo _5_ no qual a maior média de servidores não-professores corresponde a maior média dos 75-percentis de tempo de serviço.
 
-Interessante ainda notar o _grupo y_, onde o 75 percentil do tempo de serviço público é bastante baixo quando comparado aos outros grupos (assim como a quantidade de servidores/professores). Mais estranho ainda é que todos as 3 unidades acadêmicas nesse grupo possuem apenas _1 professor_. Talvez por serem departamentos novos? Podemos verificar na visualização interativa mais abaixo.
+Interessante ainda notar o _grupo 3_, onde o 75 percentil do tempo de serviço público é bastante baixo quando comparado aos outros grupos (assim como a quantidade de servidores/professores). Mais estranho ainda é que todos as 3 unidades acadêmicas nesse grupo possuem apenas _1 professor_. Talvez por serem departamentos novos? Podemos verificar na visualização interativa mais abaixo.
 
 
-```{r}
+```{r, warning=FALSE}
 
 dados_filtrados_km %>% 
     augment(dados_filtrados) %>% 
@@ -135,7 +135,7 @@ dados_filtrados_km %>%
 
 <h3>Observando os grupos encontrados</h3>
 
-```{r}
+```{r, warning=FALSE}
 
 plot_ly(
         dados_filtrados_agrupado, 
@@ -153,7 +153,7 @@ plot_ly(
 
 
 
-Observando a variável *idade_75perc* mostrada nos dados do grupo _y_ percebemos que temos servidores com mais de 2 anos de serviço nesses departamentos, ou seja essas unidades acadêmicas já não são tão novas assim. Então por que será que temos tão poucos funcionários/professores nelas? Será que está faltando recursos para fazer contratações? Fica aqui o questionamento...
+Observando a variável *idade_75perc* mostrada nos dados do grupo _3_ percebemos que temos servidores com mais de 2 anos de serviço nesses departamentos, ou seja essas unidades acadêmicas já não são tão novas assim. Então por que será que temos tão poucos funcionários/professores nelas? Será que está faltando recursos para fazer contratações? Fica aqui o questionamento...
 <br>
 
 ###Agora utilizando PCA
@@ -168,7 +168,7 @@ dados_pca = dados_filtrados %>% column_to_rownames('UORG') %>% prcomp(scale=FALS
 A relação entre os componentes encontrados e as variáveis originais
 
 
-```{r}
+```{r, warning=FALSE}
 
 print(as.data.frame(dados_pca$rotation))
 
@@ -176,7 +176,7 @@ print(as.data.frame(dados_pca$rotation))
 
 Podemos ainda ver quanta variância é capturada por cada PC:
 
-```{r}
+```{r, message=TRUE, warning=FALSE}
 tidy(dados_pca, "pcs") %>% 
     ggplot(aes(x = PC, y = cumulative, label = cumulative)) + 
     geom_line() + 
@@ -184,9 +184,9 @@ tidy(dados_pca, "pcs") %>%
     geom_text(vjust = 1, hjust = -.1)
 ```
 
-Agora vamos tentar achar a mesma estrutura de grupos que achamos usando K-means, mas dessa vez com as variáveis PC.
+Agora vamos tentar achar a mesma estrutura de grupos que achamos usando K-means, mas dessa vez com as variáveis PC. Vejamos a visualização abaixo que mostra os grupos achados anteriormente agora de acordo com as variáveis PC:
 
-```{r}
+```{r, warning=FALSE}
 au <- augment(dados_pca, dados_filtrados_agrupado)
     
  plot_ly(
@@ -205,4 +205,6 @@ au <- augment(dados_pca, dados_filtrados_agrupado)
 
 
 <h3>Conclusão</h3>
-Nesta breve análise, foi possível perceber a utilidade da ténica de PCA principalmente para agrupamentos. Muitas vezes reduzir a dimensão dos dados facilita a percepção de relações que de outra maneira estariam escondidas. Isso é possível apenas devido ao poder do PCA de *comprimir* informações multidimensionais e apresenta-las para nós na forma de uma visualização bidimensional, que facilita a percepção de padrões por nós humanos. 
+Nesta breve análise, foi possível perceber a utilidade da ténica de PCA principalmente para agrupamentos. Muitas vezes reduzir a dimensão dos dados facilita a percepção de relações que de outra maneira estariam escondidas. Isso é possível apenas devido ao poder do PCA de *comprimir* informações multidimensionais e apresenta-las para nós na forma de uma visualização bidimensional, que facilita a percepção de padrões por nós humanos.
+
+Comparando esta última visualização que utiliza PCA com a anterior podemos achar que houve uma certa *bagunça* nos dados, até porque alguns pontos que são de um mesmo grupo agora aparecem bem mais distantes. Porém, este é o poder do PCA, explicitar semelhanças e _diferenças_ que de outra maneira não estariam visíveis. A Unidade Acadêmica de Medicina do grupo _2_ por exemplo, está bem distante dos outros pontos do seu grupo pois possui um grande número de professores em regime de 20 horas comparado a outras unidades, algo que não estava perceptível na visualização anterior e foi explicitado utilizando PCA.
