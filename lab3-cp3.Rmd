@@ -1,0 +1,170 @@
+---
+title: "lab3-cp2"
+date: "27 de junho de 2017"
+output: 
+  html_document: 
+    fig_width: 10
+---
+
+##Segredos escondidos nos departamentos da UFCG
+Nesta análise iremos brincar um um pouco com dados sobre as unidades acadêmicas da Universidade Federal de Campina Grande. Mais especificamente, utilizaremos os seguintes dados:
+
+*UORG*: Unidade acadêmica em questão.<br>
+*Outro*: Representa a quantidade de funcionários da unidade acadêmica que não são professores.<br>
+*idade_75perc*: 75 percentil do tempo de serviço público dos servidores.<br>
+*prof20*: Representa a quantidade professores da unidade acadêmica em jornada de 20 horas.<br>
+*prof40*: Representa a quantidade professores da unidade acadêmica em jornada de 40 horas ou em dedicação exclusiva.<br>
+
+
+```{r, message=FALSE, warning=FALSE}
+
+library('tidyverse')
+library('plotly')
+library('ggplot2')
+library('broom')
+library('GGally')
+
+dados = read_csv(file = "dados.csv") 
+
+dados_filtrados <- dados %>% 
+  
+  mutate(prof20 = `Professor 20h`,
+         prof40 = `Professor 40h ou DE`,
+         UORG = UORG_LOTACAO
+         ) %>%
+  select(-`Professor 20h`, 
+         -`Professor 40h ou DE`, 
+         -idade_25perc,
+         -idade_mediana,
+         -UORG_LOTACAO) %>%
+  filter(complete.cases(dados))
+
+```
+Para ter uma noção melhor das relações entre as variáveis, utilizaremos um *descritivo express* que irá deixar claro se houver alguma correlação óbvia nos dados.
+
+```{r}
+dados_filtrados %>% 
+    select(-UORG) %>% 
+    ggpairs(size = .5, 
+            lower = list(continuous = wrap("points", size = .5, alpha = 0.3)))
+```
+
+Observando o *descritivo express* percebemos de cara que existe uma correlação média-forte entre as variáveis *Outro* e *idade_75perc* com valor de 0,606. Isso nos leva a entender que quantos mais funcionários não-professores, maior será o tempo de serviço público dos servidores (em geral) nessa unidade acadêmica. Será que isso é verdade? Vamos agrupar os dados e observar se vemos algum padrão.
+
+<br>
+Para embasar um pouco mais o agrupamento utilizei a estratégia de comparar:
+
+1 - A distância entre o centro dos clusters e o centro dos dados.
+
+2 - A distância entre cada ponto e o centro dos dados.
+
+Com base na proporção dessas duas medidas é possível determinar um bom valor para o número de grupos, uma vez que quando a proporção entre as duas medidas para de aumentar não vale mais a pena aumentar o número de grupos.
+
+```{r}
+how_many_groups = tibble(groups = 1:15) %>% 
+    group_by(groups) %>% 
+    do(
+        kmeans(dados_filtrados %>% select(idade_75perc), 
+               centers = .$groups, 
+               nstart = 20) %>% glance()
+    )
+
+how_many_groups %>% 
+    ggplot(aes(x = groups, y = betweenss / totss)) + 
+    geom_line() + 
+    geom_point()
+
+```
+
+Com base no gráfico acima decidi que __5 grupos__ seria uma boa quantidade para essa análise. E com a quantidade de grupos em mãos já é possível rodar o algoritmo _kmeans_ e perceber o que os dados podem nos mostrar. Nessa análise resolvi utilizar apenas uma dimensão, o 75 percentil do tempo de serviço público dos servidores.
+
+```{r}
+
+dados_filtrados_km <- dados_filtrados %>% select(idade_75perc) %>% kmeans(centers = 5, nstart = 20)
+
+dados_filtrados_agrupado = dados_filtrados_km %>% augment(dados_filtrados)
+
+dados_filtrados_km %>% 
+    augment(dados_filtrados) %>% 
+    gather(key = "variável", value = "valor", -UORG, -.cluster) %>% 
+    ggplot(aes(x = `variável`, y = valor, group = UORG, colour = .cluster, colors="Set2")) + 
+    geom_line(alpha = .2) + 
+    facet_wrap(~ .cluster, scales ="free_x") 
+
+```
+<h3>Observando os grupos econtrados</h3>
+```{r}
+
+plot_ly(
+        dados_filtrados_agrupado, 
+        x = ~Outro,
+        y = ~idade_75perc,
+        color = ~as.character(.cluster),
+        type="scatter",
+        mode="markers",
+        colors = "Set1",
+        text = ~paste("<b>",UORG, "</b><br>", "<b>Profs. 20 horas: </b>", prof20, "<br><b>Profs. 40 horas:</b> ", prof40,"<br><b>Servidores: </b>", Outro, "<br><b>75-percentil do tempo de serviço: </b>", format(round(idade_75perc, 2), nsmall=2)),
+        hoverinfo = "text"
+        ) 
+
+```
+
+###Interpretações sobre os grupos encontrados
+
+Interpretando o gráfico de coordenadas paralelas podemos confirmar o que já suspeitavamos anteriormente, a quantidade de funcionários não-professores tem sim grande influência no tempo de serviço dos servidores dessa unidade, o que nos leva a inferir que os funcionários administrativos dos departamentos são em geral mais antigos na universidade que os professores.
+
+Interessante ainda notar o _grupo 5_, onde o 75 percentil do tempo de serviço público é bastante baixo quando comparado aos outros grupos (assim como a quantidade de servidores/professores). Mais estranho ainda é que todos as 3 unidades acadêmicas nesse grupo possuem apenas _1 professor_. Vejamos as unidades presentes no grupo 5.
+
+```{r}
+print(as.data.frame(dados_filtrados_agrupado %>% filter(.cluster == 5)))
+```
+
+Observando a variável *idade_75perc* mostrada nos dados percebemos que temos servidores com mais de 2 anos de serviço nesses departamentos, ou seja essas unidades acadêmicas já não são tão novas assim. Então por que será que temos tão poucos funcionários/professores nelas? Será que está faltando recursos para fazer contratações? Fica aqui o questionamento...
+<br>
+
+###Agora utilizando PCA
+Encontrando os componentes com base nas variáveis originais:
+
+```{r}
+
+dados_pca = dados_filtrados %>% column_to_rownames('UORG') %>% prcomp(scale=FALSE)
+
+```
+
+A relação entre os componentes encontrados e as variáveis originais
+
+
+```{r}
+
+print(as.data.frame(dados_pca$rotation))
+
+```
+
+Podemos ainda ver quanta variância é capturada por cada PC:
+
+```{r}
+tidy(dados_pca, "pcs") %>% 
+    ggplot(aes(x = PC, y = cumulative, label = cumulative)) + 
+    geom_line() + 
+    geom_point() + 
+    geom_text(vjust = 1, hjust = -.1)
+```
+
+Agora vamos tentar achar a mesma estrutura de grupos que achamos usando K-means, mas dessa vez com as variáveis PC.
+
+```{r}
+au <- augment(dados_pca, dados_filtrados_agrupado)
+    
+ plot_ly(
+          au,
+          x = ~.fittedPC2,
+          y = ~.fittedPC4,
+          color = ~as.character(.cluster),
+          type = "scatter",
+          mode = "markers",
+          colors = "Set1",
+          text = ~paste("<b>",UORG, "</b><br>", "<b>Profs. 20 horas: </b>", prof20, "<br><b>Profs. 40 horas:</b> ", prof40,"<br><b>Servidores: </b>", Outro, "<br><b>75-percentil do tempo de serviço: </b>", format(round(idade_75perc, 2), nsmall=2)),
+          hoverinfo = "text"
+  )
+
+```
